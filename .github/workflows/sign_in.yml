@@ -1,11 +1,8 @@
 name: "🌙 Endfield Daily Sign-in"
 
 on:
-  # Chạy lúc 3:00 sáng GMT+7 = 20:00 UTC hôm trước
   schedule:
-    - cron: "0 20 * * *"
-
-  # Cho phép chạy thủ công từ tab Actions
+    - cron: "0 20 * * *"   # 3:00 sáng GMT+7 = 20:00 UTC hôm trước
   workflow_dispatch:
 
 jobs:
@@ -29,7 +26,25 @@ jobs:
 
       - name: "✍️ Run Sign-in"
         env:
-          # Chỉ cần 1 Secret duy nhất!
-          ENDFIELD_CONFIG: ${{ secrets.ENDFIELD_CONFIG }}
           PYTHONIOENCODING: utf-8
+
+          # ── Tài khoản (mỗi Secret = 1 account JSON) ──────────────────────
+          # Thêm bao nhiêu account tùy ý, đặt tên ACCOUNT_1, ACCOUNT_2, ...
+          # Slot trống sẽ bị bỏ qua tự động.
+          ACCOUNT_1:  ${{ secrets.ACCOUNT_1 }}
+          ACCOUNT_2:  ${{ secrets.ACCOUNT_2 }}
+          ACCOUNT_3:  ${{ secrets.ACCOUNT_3 }}
+          ACCOUNT_4:  ${{ secrets.ACCOUNT_4 }}
+          ACCOUNT_5:  ${{ secrets.ACCOUNT_5 }}
+          ACCOUNT_6:  ${{ secrets.ACCOUNT_6 }}
+          ACCOUNT_7:  ${{ secrets.ACCOUNT_7 }}
+          ACCOUNT_8:  ${{ secrets.ACCOUNT_8 }}
+          ACCOUNT_9:  ${{ secrets.ACCOUNT_9 }}
+          ACCOUNT_10: ${{ secrets.ACCOUNT_10 }}
+
+          # ── Thông báo (tuỳ chọn, dùng chung cho tất cả accounts) ─────────
+          DISCORD_WEBHOOK:    ${{ secrets.DISCORD_WEBHOOK }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+
         run: python sign_in.py

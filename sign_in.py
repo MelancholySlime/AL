@@ -4,7 +4,7 @@ Arknights: Endfield - Auto Daily Sign-in Script
 ================================================
 Tự động điểm danh hàng ngày trên game.skport.com/endfield/sign-in
 
-Chỉ cần 1 GitHub Secret duy nhất: ENDFIELD_CONFIG (JSON)
+Mỗi GitHub Secret ACCOUNT_N = 1 tài khoản (JSON)
 Xem README.md để biết cách cấu hình.
 """
 
@@ -15,11 +15,11 @@ import hmac
 import hashlib
 import time
 
-# Fix UTF-8 output tren Windows (tranh loi UnicodeEncodeError)
+# Fix UTF-8 output trên Windows
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
-# curl_cffi gia lap TLS fingerprint cua Chrome bypass Cloudflare 403
+# curl_cffi giả lập TLS fingerprint Chrome → bypass TencentEdgeOne 40x
 from curl_cffi import requests
 
 # ─────────────────────────────────────────────
@@ -30,78 +30,71 @@ SIGN_IN_URL  = "https://zonai.skport.com/web/v1/game/endfield/attendance"
 SIGN_IN_PATH = "/web/v1/game/endfield/attendance"
 
 BASE_HEADERS = {
-    "Accept":           "*/*",
-    "Accept-Encoding":  "gzip, deflate, br, zstd",
-    "Content-Type":     "application/json",
-    "User-Agent":       "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
-    "Referer":          "https://game.skport.com/",
-    "platform":         "3",
-    "vName":            "1.0.0",
-    "Origin":           "https://game.skport.com",
-    "Connection":       "keep-alive",
-    "Sec-Fetch-Dest":   "empty",
-    "Sec-Fetch-Mode":   "cors",
-    "Sec-Fetch-Site":   "same-site",
-    "Priority":         "u=0",
+    "Accept":          "*/*",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Content-Type":    "application/json",
+    "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
+    "Referer":         "https://game.skport.com/",
+    "platform":        "3",
+    "vName":           "1.0.0",
+    "Origin":          "https://game.skport.com",
+    "Connection":      "keep-alive",
+    "Sec-Fetch-Dest":  "empty",
+    "Sec-Fetch-Mode":  "cors",
+    "Sec-Fetch-Site":  "same-site",
+    "Priority":        "u=0",
 }
 
 # ─────────────────────────────────────────────
-#  LOAD CONFIG from single JSON secret
+#  LOAD ACCOUNTS
+#  Mỗi Secret ACCOUNT_N chứa 1 JSON tài khoản:
+#  {
+#    "cred":    "SK_OAUTH_CRED_KEY",
+#    "token":   "SK_TOKEN_CACHE_KEY",
+#    "game_id": "123456789",
+#    "server":  "2",          // 2=Asia  3=EU/Americas
+#    "lang":    "en",
+#    "name":    "Tên hiển thị"
+#  }
 # ─────────────────────────────────────────────
 
-def load_config() -> dict:
-    """
-    Đọc toàn bộ config từ biến môi trường ENDFIELD_CONFIG (JSON string).
+def load_accounts() -> list[dict]:
+    accounts = []
+    for i in range(1, 21):          # Hỗ trợ tối đa 20 tài khoản
+        raw = os.environ.get(f"ACCOUNT_{i}", "").strip()
+        if not raw:
+            continue               # Bỏ qua slot trống, tiếp tục dò
 
-    Cấu trúc JSON:
-    {
-      "accounts": [
-        {
-          "cred":    "SK_OAUTH_CRED_KEY value",
-          "token":   "SK_TOKEN_CACHE_KEY value",
-          "game_id": "123456789",
-          "server":  "2",
-          "lang":    "en",
-          "name":    "Player 1"
-        }
-      ],
-      "discord_webhook":    "https://discord.com/api/webhooks/...",
-      "telegram_bot_token": "...",
-      "telegram_chat_id":   "..."
-    }
-    """
-    raw = os.environ.get("ENDFIELD_CONFIG", "").strip()
-    if not raw:
-        print("❌ Biến môi trường ENDFIELD_CONFIG chưa được đặt!")
-        print("   Vui lòng tạo Secret ENDFIELD_CONFIG trong GitHub Secrets.")
-        sys.exit(1)
+        try:
+            acc = json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(f"  [WARN] ACCOUNT_{i} không phải JSON hợp lệ: {e} — bỏ qua")
+            continue
 
-    try:
-        config = json.loads(raw)
-    except json.JSONDecodeError as e:
-        print(f"❌ ENDFIELD_CONFIG không phải JSON hợp lệ: {e}")
-        sys.exit(1)
+        # Validate bắt buộc
+        missing = [k for k in ("cred", "token", "game_id") if not acc.get(k, "").strip()]
+        if missing:
+            print(f"  [WARN] ACCOUNT_{i} thiếu field: {missing} — bỏ qua")
+            continue
 
-    return config
+        acc.setdefault("server", "2")
+        acc.setdefault("lang",   "en")
+        acc.setdefault("name",   f"Account {i}")
+        accounts.append(acc)
 
+    return accounts
 
 # ─────────────────────────────────────────────
-#  SIGNING LOGIC (HMAC-SHA256 → MD5)
+#  SIGNING LOGIC
 # ─────────────────────────────────────────────
 
-def generate_sign(path: str, method: str, headers: dict, query: str, body: str, token: str) -> str:
-    """
-    Tái tạo đúng logic signing của trang gốc (JS → Python):
-      stringToSign = path + (GET ? query : body)
-                   + timestamp
-                   + JSON.stringify({ platform, timestamp, dId, vName })
-      sign = MD5( HEX( HMAC-SHA256(stringToSign, token) ) )
-    """
+def generate_sign(path: str, method: str, headers: dict,
+                  query: str, body: str, token: str) -> str:
     string_to_sign = path + (query if method.upper() == "GET" else body)
 
-    timestamp = headers.get("timestamp", "")
-    if timestamp:
-        string_to_sign += str(timestamp)
+    ts = headers.get("timestamp", "")
+    if ts:
+        string_to_sign += ts
 
     header_obj = {}
     for key in ["platform", "timestamp", "dId", "vName"]:
@@ -112,40 +105,35 @@ def generate_sign(path: str, method: str, headers: dict, query: str, body: str, 
 
     string_to_sign += json.dumps(header_obj, separators=(",", ":"))
 
-    hmac_bytes = hmac.new(
+    hmac_hex = hmac.new(
         token.encode("utf-8"),
         string_to_sign.encode("utf-8"),
         hashlib.sha256,
-    ).digest()
-    hmac_hex = hmac_bytes.hex()
+    ).digest().hex()
 
     return hashlib.md5(hmac_hex.encode("utf-8")).hexdigest()
 
 
 # ─────────────────────────────────────────────
-#  SIGN-IN FUNCTION
+#  SIGN-IN
 # ─────────────────────────────────────────────
 
-def do_sign_in(account: dict) -> str:
-    """Điểm danh cho một tài khoản, trả về chuỗi kết quả."""
-    cred    = account.get("cred", "")
-    token   = account.get("token", "")
-    game_id = account.get("game_id", "")
-    server  = account.get("server", "2")
-    lang    = account.get("lang", "en")
-    name    = account.get("name", "Player")
-
-    if not (cred and token and game_id):
-        return f"[{name}] ❌ Thiếu cred / token / game_id trong config!"
+def do_sign_in(acc: dict) -> str:
+    cred    = acc["cred"].strip()
+    token   = acc["token"].strip()
+    game_id = acc["game_id"].strip()
+    server  = acc.get("server", "2").strip()
+    lang    = acc.get("lang",   "en").strip()
+    name    = acc.get("name",   "Player").strip()
 
     timestamp = str(int(time.time()))
 
     headers = {
         **BASE_HEADERS,
-        "cred":          cred,
-        "sk-game-role":  f"3_{game_id}_{server}",
-        "sk-language":   lang,
-        "timestamp":     timestamp,
+        "cred":         cred,
+        "sk-game-role": f"3_{game_id}_{server}",
+        "sk-language":  lang,
+        "timestamp":    timestamp,
     }
     headers["sign"] = generate_sign(SIGN_IN_PATH, "POST", headers, "", "", token)
 
@@ -157,26 +145,24 @@ def do_sign_in(account: dict) -> str:
             impersonate="chrome",
         )
     except Exception as e:
-        return f"[{name}] ❌ Request error: {e}"
+        return f"[{name}] ❌ Lỗi kết nối: {e}"
 
-    # Server trả JSON body dù HTTP status là 200, 401, hay 403 — luôn parse JSON trước
     try:
         data = resp.json()
     except Exception:
-        return f"[{name}] ❌ HTTP {resp.status_code} – Response không phải JSON: {resp.text[:200]}"
+        return f"[{name}] ❌ HTTP {resp.status_code} — Response không phải JSON: {resp.text[:200]}"
 
     code    = data.get("code")
     message = data.get("message", "Unknown")
 
-    # HTTP 401 / code 10000+"Request exception" = cred hết hạn
-    # HTTP 403 / code 10000+"Token expired"     = token hết hạn
-    if code == 10000 or resp.status_code == 401:
+    # HTTP 401 hoặc code 10000 = cred/token hết hạn
+    if resp.status_code == 401 or code == 10000:
         return (
             f"[{name}] ⚠️  Cred/Token hết hạn! (HTTP {resp.status_code})\n"
-            f"  → Lấy lại tại: game.skport.com/endfield/sign-in → F12 → Console\n"
-            f"  → Cập nhật Secret ENDFIELD_CONFIG với cred và token mới."
+            f"  → Lấy lại: game.skport.com/endfield/sign-in → F12 → Console\n"
+            f"  → Cập nhật Secret ACCOUNT_N tương ứng."
         )
-    # HTTP 403 / code 10001 = đã điểm danh hôm nay rồi → bình thường
+    # HTTP 403 + code 10001 = đã điểm danh hôm nay
     elif code == 10001:
         return f"[{name}] ℹ️  Đã điểm danh hôm nay rồi!"
     elif message == "OK":
@@ -227,36 +213,39 @@ def main() -> None:
     print("  🌙 Arknights: Endfield – Auto Daily Sign-in")
     print("=" * 52)
 
-    config   = load_config()
-    accounts = config.get("accounts", [])
+    # Thông báo chung (tuỳ chọn)
+    discord_webhook    = os.environ.get("DISCORD_WEBHOOK", "").strip()
+    telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    telegram_chat_id   = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 
-    discord_webhook    = config.get("discord_webhook", "")
-    telegram_bot_token = config.get("telegram_bot_token", "")
-    telegram_chat_id   = config.get("telegram_chat_id", "")
+    accounts = load_accounts()
 
     if not accounts:
         msg = (
-            "❌ Không tìm thấy tài khoản nào trong ENDFIELD_CONFIG!\n"
-            "Kiểm tra lại key 'accounts' trong JSON."
+            "❌ Không tìm thấy tài khoản nào!\n"
+            "Hãy tạo Secret ACCOUNT_1 (và ACCOUNT_2, ...) trong GitHub Secrets.\n"
+            'Format: {"cred":"...","token":"...","game_id":"...","server":"2","lang":"en","name":"..."}'
         )
         print(msg)
         send_discord(discord_webhook, msg)
         send_telegram(telegram_bot_token, telegram_chat_id, msg)
         return
 
+    print(f"\nTìm thấy {len(accounts)} tài khoản.\n")
+
     results = []
     for acc in accounts:
         name = acc.get("name", "Player")
-        print(f"\n→ Đang điểm danh: {name} (ID: {acc.get('game_id', '?')})")
+        print(f"→ Đang điểm danh: {name} (ID: {acc.get('game_id', '?')})")
         result = do_sign_in(acc)
-        print(f"  {result}")
+        print(f"  {result}\n")
         results.append(result)
-        time.sleep(1)  # tránh rate limit
+        time.sleep(1.5)     # Tránh rate limit
 
     summary      = "\n".join(results)
     full_message = f"📋 Endfield Sign-in Report\n{'─' * 32}\n{summary}"
 
-    print(f"\n{'─' * 52}")
+    print("─" * 52)
     print(full_message)
 
     send_discord(discord_webhook, full_message)
