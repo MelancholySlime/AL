@@ -15,7 +15,11 @@ import hmac
 import hashlib
 import time
 
-# curl_cffi giả lập TLS fingerprint của Chrome → bypass Cloudflare 403
+# Fix UTF-8 output tren Windows (tranh loi UnicodeEncodeError)
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8")
+
+# curl_cffi gia lap TLS fingerprint cua Chrome bypass Cloudflare 403
 from curl_cffi import requests
 
 # ─────────────────────────────────────────────
@@ -146,34 +150,39 @@ def do_sign_in(account: dict) -> str:
     headers["sign"] = generate_sign(SIGN_IN_PATH, "POST", headers, "", "", token)
 
     try:
-        # impersonate="chrome" → gửi đúng TLS fingerprint của Chrome, bypass Cloudflare
         resp = requests.post(
             SIGN_IN_URL,
             headers=headers,
             timeout=30,
             impersonate="chrome",
         )
-        data = resp.json()
     except Exception as e:
         return f"[{name}] ❌ Request error: {e}"
 
-    if resp.status_code == 403:
-        return f"[{name}] ❌ 403 Forbidden – cred có thể đã hết hạn, hãy lấy lại token!"
-    if resp.status_code != 200:
-        return f"[{name}] ❌ HTTP {resp.status_code}: {resp.text[:200]}"
+    # Server trả JSON body dù HTTP status là 200, 401, hay 403 — luôn parse JSON trước
+    try:
+        data = resp.json()
+    except Exception:
+        return f"[{name}] ❌ HTTP {resp.status_code} – Response không phải JSON: {resp.text[:200]}"
 
     code    = data.get("code")
     message = data.get("message", "Unknown")
 
-    if code == 10000:
+    # HTTP 401 / code 10000+"Request exception" = cred hết hạn
+    # HTTP 403 / code 10000+"Token expired"     = token hết hạn
+    if code == 10000 or resp.status_code == 401:
         return (
-            f"[{name}] ⚠️  Token hết hạn!\n"
-            f"  → Vui lòng cập nhật 'cred' và 'token' trong ENDFIELD_CONFIG."
+            f"[{name}] ⚠️  Cred/Token hết hạn! (HTTP {resp.status_code})\n"
+            f"  → Lấy lại tại: game.skport.com/endfield/sign-in → F12 → Console\n"
+            f"  → Cập nhật Secret ENDFIELD_CONFIG với cred và token mới."
         )
+    # HTTP 403 / code 10001 = đã điểm danh hôm nay rồi → bình thường
+    elif code == 10001:
+        return f"[{name}] ℹ️  Đã điểm danh hôm nay rồi!"
     elif message == "OK":
         return f"[{name}] ✅ Điểm danh thành công!"
     else:
-        return f"[{name}] ℹ️  {message} (code={code})"
+        return f"[{name}] ℹ️  {message} (code={code}, HTTP {resp.status_code})"
 
 
 # ─────────────────────────────────────────────

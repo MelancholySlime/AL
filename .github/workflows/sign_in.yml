@@ -31,4 +31,5 @@ jobs:
         env:
           # Chỉ cần 1 Secret duy nhất!
           ENDFIELD_CONFIG: ${{ secrets.ENDFIELD_CONFIG }}
+          PYTHONIOENCODING: utf-8
         run: python sign_in.py
