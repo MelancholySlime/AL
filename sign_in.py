@@ -5,7 +5,7 @@ Arknights: Endfield - Auto Daily Sign-in Script
 Tự động điểm danh hàng ngày trên game.skport.com/endfield/sign-in
 
 Mỗi GitHub Secret ACCOUNT_N = 1 tài khoản (JSON)
-Xem README.md để biết cách cấu hình.
+Xem README.md để biết cách cấu hình. 
 """
 
 import os
