@@ -85,6 +85,17 @@ def load_accounts() -> list[dict]:
     return accounts
 
 # ─────────────────────────────────────────────
+#  HELPERS
+# ─────────────────────────────────────────────
+
+def mask_id(game_id: str) -> str:
+    """Hiển thị nửa đầu ID, che nửa sau bằng ● để bảo mật."""
+    n = len(game_id)
+    show = (n + 1) // 2          # làm tròn lên
+    return game_id[:show] + "●" * (n - show)
+
+
+# ─────────────────────────────────────────────
 #  SIGNING LOGIC
 # ─────────────────────────────────────────────
 
@@ -236,7 +247,7 @@ def main() -> None:
     results = []
     for acc in accounts:
         name = acc.get("name", "Player")
-        print(f"→ Đang điểm danh: {name} (ID: {acc.get('game_id', '?')})")
+        print(f"→ Đang điểm danh: {name} (ID: {mask_id(acc.get('game_id', '?'))})")
         result = do_sign_in(acc)
         print(f"  {result}\n")
         results.append(result)
