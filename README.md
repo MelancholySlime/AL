@@ -33,7 +33,7 @@ console.log('token :', localStorage.getItem('SK_TOKEN_CACHE_KEY'));
 
 3. **Copy** 2 giá trị `cred` và `token` ra notepad.
 
-> **Lấy Game ID:** F12 → **Network** → tìm request tới `zonai.skport.com` → xem header `sk-game-role`, format `3_<ID>_<SERVER>` → lấy phần `<ID>`.
+> **Lấy Game ID:** F12 → **Network** → nhấn nút Sign-in → tìm request tới `zonai.skport.com` → xem header `sk-game-role`, format `3_<ID>_<SERVER>` → lấy phần `<ID>`.
 
 ---
 
@@ -71,16 +71,6 @@ Vào **Settings → Secrets and variables → Actions → New repository secret*
 | `lang` | `en` / `ja` / `zh_Hant` / `zh_Hans` / `ko` / `ru_RU` |
 | `name` | Tên hiển thị tuỳ ý |
 
-#### Thông báo (tuỳ chọn, dùng chung cho tất cả accounts)
-
-| Secret Name | Giá trị |
-|-------------|---------|
-| `DISCORD_WEBHOOK` | URL Discord Webhook |
-| `TELEGRAM_BOT_TOKEN` | Token bot Telegram |
-| `TELEGRAM_CHAT_ID` | Chat ID Telegram |
-
-> Để trống nếu không dùng — script tự bỏ qua.
-
 ---
 
 ### Bước 3 – Push lên GitHub
@@ -91,8 +81,70 @@ git commit -m "feat: add Endfield auto sign-in"
 git push
 ```
 
-Sau khi push, Actions sẽ **tự chạy lúc 3h sáng GMT+7 mỗi ngày**.  
+Sau khi push, Actions sẽ **tự chạy lúc 3h sáng GMT+7 mỗi ngày**.
 Chạy thủ công: **Actions → 🌙 Endfield Daily Sign-in → Run workflow**
+
+---
+
+## 📢 Thiết lập thông báo (tuỳ chọn)
+
+### Discord
+
+**1. Tạo Webhook trong Discord**
+
+1. Mở Discord → vào **server** và **channel** muốn nhận thông báo
+2. Click ⚙️ **Edit Channel** (biểu tượng bánh răng cạnh tên channel)
+3. Chọn **Integrations** → **Webhooks** → **New Webhook**
+4. Đặt tên tuỳ ý (ví dụ: `Endfield Bot`) → nhấn **Copy Webhook URL**
+
+URL có dạng:
+```
+https://discord.com/api/webhooks/1234567890987654321/xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**2. Thêm vào GitHub Secrets**
+
+| Secret Name | Giá trị |
+|-------------|---------|
+| `DISCORD_WEBHOOK` | URL vừa copy ở bước trên |
+
+**Kết quả nhận được trong Discord:**
+```
+📋 Endfield Sign-in Report
+────────────────────────────────
+[Aurora] ✅ Điểm danh thành công!
+[Yuuki]  ℹ️  Đã điểm danh hôm nay rồi!
+```
+
+---
+
+### Telegram
+
+**1. Tạo Bot Telegram**
+
+1. Mở Telegram → tìm **[@BotFather](https://t.me/botfather)** → gõ `/newbot`
+2. Đặt tên bot (ví dụ: `Endfield Sign-in Bot`)
+3. Đặt username bot (phải kết thúc bằng `bot`, ví dụ: `endfield_signin_bot`)
+4. BotFather sẽ gửi lại **Bot Token** có dạng:
+```
+7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**2. Lấy Chat ID**
+
+1. Mở Telegram → tìm **[@userinfobot](https://t.me/userinfobot)** → gửi bất kỳ tin nhắn nào
+2. Bot sẽ trả về thông tin bao gồm **Id** của bạn (ví dụ: `123456780`)
+
+> Nếu muốn nhận thông báo vào **group**: thêm bot vào group → tìm **[@getidsbot](https://t.me/getidsbot)** → thêm vào group → gõ `/start` → lấy **Chat ID** của group (thường có dấu `-` ở đầu, ví dụ: `-1001234567890`)
+
+**3. Thêm vào GitHub Secrets**
+
+| Secret Name | Giá trị |
+|-------------|---------|
+| `TELEGRAM_BOT_TOKEN` | Token lấy từ BotFather |
+| `TELEGRAM_CHAT_ID` | ID cá nhân hoặc ID group |
+
+> **Lưu ý:** Phải nhắn tin cho bot ít nhất 1 lần trước khi bot có thể gửi message cho bạn. Tìm bot theo username → nhấn **Start**.
 
 ---
 
