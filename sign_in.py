@@ -14,7 +14,9 @@ import json
 import hmac
 import hashlib
 import time
-import requests
+
+# curl_cffi giả lập TLS fingerprint của Chrome → bypass Cloudflare 403
+from curl_cffi import requests
 
 # ─────────────────────────────────────────────
 #  CONSTANTS
@@ -144,13 +146,21 @@ def do_sign_in(account: dict) -> str:
     headers["sign"] = generate_sign(SIGN_IN_PATH, "POST", headers, "", "", token)
 
     try:
-        resp = requests.post(SIGN_IN_URL, headers=headers, timeout=30)
-        resp.raise_for_status()
+        # impersonate="chrome" → gửi đúng TLS fingerprint của Chrome, bypass Cloudflare
+        resp = requests.post(
+            SIGN_IN_URL,
+            headers=headers,
+            timeout=30,
+            impersonate="chrome",
+        )
         data = resp.json()
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         return f"[{name}] ❌ Request error: {e}"
-    except json.JSONDecodeError:
-        return f"[{name}] ❌ Response không phải JSON hợp lệ"
+
+    if resp.status_code == 403:
+        return f"[{name}] ❌ 403 Forbidden – cred có thể đã hết hạn, hãy lấy lại token!"
+    if resp.status_code != 200:
+        return f"[{name}] ❌ HTTP {resp.status_code}: {resp.text[:200]}"
 
     code    = data.get("code")
     message = data.get("message", "Unknown")
@@ -179,7 +189,7 @@ def send_discord(webhook: str, message: str) -> None:
         "content":    message,
     }
     try:
-        r = requests.post(webhook, json=payload, timeout=10)
+        r = requests.post(webhook, json=payload, timeout=10, impersonate="chrome")
         if r.status_code not in (200, 204):
             print(f"  [Discord] Warning: HTTP {r.status_code}")
     except Exception as e:
@@ -192,7 +202,7 @@ def send_telegram(bot_token: str, chat_id: str, message: str) -> None:
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
     try:
-        r = requests.post(url, json=payload, timeout=10)
+        r = requests.post(url, json=payload, timeout=10, impersonate="chrome")
         if not r.ok:
             print(f"  [Telegram] Warning: {r.text[:200]}")
     except Exception as e:
