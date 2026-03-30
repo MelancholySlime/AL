@@ -191,7 +191,7 @@ def send_discord(webhook: str, message: str) -> None:
         return
     payload = {
         "username":   "Endfield Sign-in Bot",
-        "avatar_url": "https://i.imgur.com/TguAOiA.png",
+        "avatar_url": "https://cdn.discordapp.com/emojis/1368284815165493318.webp?size=96&animated=true",
         "content":    message,
     }
     try:
