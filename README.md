@@ -33,7 +33,7 @@ console.log('token :', localStorage.getItem('SK_TOKEN_CACHE_KEY'));
 
 3. **Copy** 2 giá trị `cred` và `token` ra notepad.
 
-> **Lấy Game ID:** F12 → **Network** → nhấn nút Sign-in → tìm request tới `zonai.skport.com` → xem header `sk-game-role`, format `3_<ID>_<SERVER>` → lấy phần `<ID>`.
+> **Lấy Game ID:** F12 → **Network** → tìm request tới `zonai.skport.com` → xem header `sk-game-role`, format `3_<ID>_<SERVER>` → lấy phần `<ID>`.
 
 ---
 
