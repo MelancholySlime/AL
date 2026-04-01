@@ -8,32 +8,37 @@ Script tự động điểm danh hàng ngày trên [game.skport.com/endfield/sig
 
 - ✅ Tự động điểm danh mỗi ngày lúc 3h sáng GMT+7
 - 👥 Hỗ trợ **nhiều tài khoản** — mỗi Secret = 1 account
-- 🔒 Token lưu trong **GitHub Secrets** — an toàn tuyệt đối
+- 🔑 Dùng `ACCOUNT_TOKEN` dài hạn (~vài tháng) — không cần renew thường xuyên
+- 🔄 **Tự động refresh** `cred` và `signToken` mỗi lần chạy — không bao giờ bị 401
+- 🔍 **Tự động detect** Game ID và Server — không cần nhập tay
+- 🔒 Token lưu trong **GitHub Secrets** (mã hoá) — không ai thấy được
 - 📢 Thông báo qua **Discord** hoặc **Telegram** (tuỳ chọn)
-- ▶️  Có thể chạy thủ công từ tab **Actions** bất kỳ lúc nào
 
 ---
 
 ## 🚀 Hướng dẫn cài đặt
 
-### Bước 1 – Lấy Cred & Token từ trình duyệt
+### Bước 1 – Lấy `ACCOUNT_TOKEN` từ trình duyệt
 
-1. Đăng nhập vào [game.skport.com/endfield/sign-in](https://game.skport.com/endfield/sign-in)
-2. Nhấn **F12** → tab **Console** → dán code sau và nhấn **Enter**:
+`ACCOUNT_TOKEN` là cookie dài hạn (~vài tháng) — chỉ cần lấy 1 lần!
 
-```javascript
-function getCookie(name) {
-  const v = `; ${document.cookie}`;
-  const p = v.split(`; ${name}=`);
-  if (p.length === 2) return p.pop().split(';').shift();
-}
-console.log('cred  :', getCookie('SK_OAUTH_CRED_KEY'));
-console.log('token :', localStorage.getItem('SK_TOKEN_CACHE_KEY'));
-```
+**Cách 1: Qua URL (dễ nhất)**
 
-3. **Copy** 2 giá trị `cred` và `token` ra notepad.
+1. Đăng nhập vào [skport.com](https://www.skport.com)
+2. Mở tab mới, truy cập URL sau:
+   ```
+   https://web-api.skport.com/cookie_store/account_token
+   ```
+3. Trang sẽ hiển thị token của anh — **copy toàn bộ chuỗi**
 
-> **Lấy Game ID:** F12 → **Network** → nhấn nút Sign-in → tìm request tới `zonai.skport.com` → xem header `sk-game-role`, format `3_<ID>_<SERVER>` → lấy phần `<ID>`.
+**Cách 2: Qua DevTools**
+
+1. Đăng nhập vào [skport.com](https://www.skport.com)
+2. Nhấn **F12** → tab **Application** (Chrome) hoặc **Storage** (Firefox)
+3. Chọn **Cookies** → `https://www.skport.com` (hoặc `.skport.com`)
+4. Tìm cookie tên **`ACCOUNT_TOKEN`** → copy giá trị
+
+> ⚠️ **Lưu ý:** `ACCOUNT_TOKEN` khác với `SK_OAUTH_CRED_KEY`. Phải lấy đúng `ACCOUNT_TOKEN`.
 
 ---
 
@@ -47,33 +52,53 @@ Vào **Settings → Secrets and variables → Actions → New repository secret*
 |-------------|----------------|
 | `ACCOUNT_1` | JSON của tài khoản 1 |
 | `ACCOUNT_2` | JSON của tài khoản 2 |
-| `ACCOUNT_3` | ... |
+| ... | ... |
 
 **Format JSON cho mỗi Secret:**
 
 ```json
 {
-  "cred":    "GIÁ_TRỊ_CRED",
-  "token":   "GIÁ_TRỊ_TOKEN",
-  "game_id": "123456789",
-  "server":  "2",
-  "lang":    "en",
-  "name":    "Tên hiển thị"
+  "account_token": "GIÁ_TRỊ_ACCOUNT_TOKEN",
+  "lang":          "en",
+  "name":          "Yuuki"
 }
 ```
 
-| Field | Mô tả |
-|-------|-------|
-| `cred` | `SK_OAUTH_CRED_KEY` từ cookie (Bước 1) |
-| `token` | `SK_TOKEN_CACHE_KEY` từ localStorage (Bước 1) |
-| `game_id` | ID game Endfield (chỉ số) |
-| `server` | `"2"` = Asia &nbsp;/&nbsp; `"3"` = Americas/Europe |
-| `lang` | `en` / `ja` / `zh_Hant` / `zh_Hans` / `ko` / `ru_RU` |
-| `name` | Tên hiển thị tuỳ ý |
+| Field | Mô tả | Bắt buộc |
+|-------|-------|----------|
+| `account_token` | Token lấy từ Bước 1 | ✅ |
+| `lang` | Ngôn ngữ: `en` / `ja` / `zh_Hant` / `zh_Hans` / `ko` / `ru_RU` | ❌ (mặc định `en`) |
+| `name` | Tên hiển thị tuỳ ý trong log | ❌ (mặc định `Account N`) |
+
+> 💡 **Không cần nhập Game ID hay Server** — script tự động detect!
 
 ---
 
-### Bước 3 – Push lên GitHub
+### Bước 3 – Thiết lập thông báo (tuỳ chọn)
+
+#### Discord
+
+1. Vào server Discord → ⚙️ **Edit Channel** → **Integrations** → **Webhooks** → **New Webhook**
+2. Copy Webhook URL
+3. Tạo Secret `DISCORD_WEBHOOK` với URL vừa copy
+
+#### Telegram
+
+1. Chat với **[@BotFather](https://t.me/botfather)** → `/newbot` → lấy **Bot Token**
+2. Chat với **[@userinfobot](https://t.me/userinfobot)** → lấy **Chat ID** của bạn
+3. Tạo 2 Secrets:
+   - `TELEGRAM_BOT_TOKEN` = Bot Token
+   - `TELEGRAM_CHAT_ID` = Chat ID
+
+| Secret Name | Mô tả |
+|-------------|-------|
+| `DISCORD_WEBHOOK` | URL Discord Webhook |
+| `TELEGRAM_BOT_TOKEN` | Token bot Telegram |
+| `TELEGRAM_CHAT_ID` | Chat ID cá nhân hoặc group |
+
+---
+
+### Bước 4 – Push lên GitHub
 
 ```bash
 git add .
@@ -81,70 +106,7 @@ git commit -m "feat: add Endfield auto sign-in"
 git push
 ```
 
-Sau khi push, Actions sẽ **tự chạy lúc 3h sáng GMT+7 mỗi ngày**.
-Chạy thủ công: **Actions → 🌙 Endfield Daily Sign-in → Run workflow**
-
----
-
-## 📢 Thiết lập thông báo (tuỳ chọn)
-
-### Discord
-
-**1. Tạo Webhook trong Discord**
-
-1. Mở Discord → vào **server** và **channel** muốn nhận thông báo
-2. Click ⚙️ **Edit Channel** (biểu tượng bánh răng cạnh tên channel)
-3. Chọn **Integrations** → **Webhooks** → **New Webhook**
-4. Đặt tên tuỳ ý (ví dụ: `Endfield Bot`) → nhấn **Copy Webhook URL**
-
-URL có dạng:
-```
-https://discord.com/api/webhooks/1234567890987654321/xxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-**2. Thêm vào GitHub Secrets**
-
-| Secret Name | Giá trị |
-|-------------|---------|
-| `DISCORD_WEBHOOK` | URL vừa copy ở bước trên |
-
-**Kết quả nhận được trong Discord:**
-```
-📋 Endfield Sign-in Report
-────────────────────────────────
-[Aurora] ✅ Điểm danh thành công!
-[Yuuki]  ℹ️  Đã điểm danh hôm nay rồi!
-```
-
----
-
-### Telegram
-
-**1. Tạo Bot Telegram**
-
-1. Mở Telegram → tìm **[@BotFather](https://t.me/botfather)** → gõ `/newbot`
-2. Đặt tên bot (ví dụ: `Endfield Sign-in Bot`)
-3. Đặt username bot (phải kết thúc bằng `bot`, ví dụ: `endfield_signin_bot`)
-4. BotFather sẽ gửi lại **Bot Token** có dạng:
-```
-7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-**2. Lấy Chat ID**
-
-1. Mở Telegram → tìm **[@userinfobot](https://t.me/userinfobot)** → gửi bất kỳ tin nhắn nào
-2. Bot sẽ trả về thông tin bao gồm **Id** của bạn (ví dụ: `123456780`)
-
-> Nếu muốn nhận thông báo vào **group**: thêm bot vào group → tìm **[@getidsbot](https://t.me/getidsbot)** → thêm vào group → gõ `/start` → lấy **Chat ID** của group (thường có dấu `-` ở đầu, ví dụ: `-1001234567890`)
-
-**3. Thêm vào GitHub Secrets**
-
-| Secret Name | Giá trị |
-|-------------|---------|
-| `TELEGRAM_BOT_TOKEN` | Token lấy từ BotFather |
-| `TELEGRAM_CHAT_ID` | ID cá nhân hoặc ID group |
-
-> **Lưu ý:** Phải nhắn tin cho bot ít nhất 1 lần trước khi bot có thể gửi message cho bạn. Tìm bot theo username → nhấn **Start**.
+▶️ Chạy thủ công: **Actions → 🌙 Endfield Daily Sign-in → Run workflow**
 
 ---
 
@@ -161,20 +123,28 @@ https://discord.com/api/webhooks/1234567890987654321/xxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 | Thông báo | Ý nghĩa |
 |-----------|---------|
-| ✅ Điểm danh thành công! | Điểm danh thành công |
-| ℹ️ Đã điểm danh hôm nay rồi! | Bình thường — đã làm rồi |
-| ⚠️ Cred/Token hết hạn! | Cần lấy lại token (Bước 1) |
-| ❌ Lỗi kết nối | Vấn đề mạng — tự retry sau |
+| ✅ Điểm danh thành công! | Thành công, kèm phần thưởng |
+| ℹ️ Đã điểm danh hôm nay rồi! | Bình thường |
+| ⚠️ ACCOUNT_TOKEN hết hạn! | Lấy lại token (Bước 1) |
+| ❌ Không lấy được OAuth code | Kiểm tra ACCOUNT_TOKEN |
 
 ---
 
-## 🔄 Khi Token hết hạn
+## 🔄 Khi cần renew token
 
-Token thường hết hạn sau vài tuần. Khi nhận `⚠️ Cred/Token hết hạn!`:
+`ACCOUNT_TOKEN` thường sống **vài tháng**. Khi nhận thông báo `⚠️ ACCOUNT_TOKEN hết hạn!`:
 
-1. Đăng nhập lại vào trang sign-in
-2. Lấy lại `cred` và `token` theo **Bước 1**
+1. Vào `https://web-api.skport.com/cookie_store/account_token`
+2. Copy token mới
 3. Cập nhật Secret `ACCOUNT_N` tương ứng
+
+---
+
+## 🔒 Về bảo mật
+
+- `ACCOUNT_TOKEN` được lưu trong **GitHub Secrets** (AES-256 encrypted)
+- **Không ai trong repo** có thể đọc giá trị Secret — kể cả contributors
+- Token chỉ được inject vào môi trường khi workflow chạy, không xuất hiện trong logs
 
 ---
 
@@ -192,4 +162,4 @@ Token thường hết hạn sau vài tuần. Khi nhận `⚠️ Cred/Token hết
 
 ---
 
-*Made with 💜 | Inspired by [canaria3406/skport-auto-sign](https://github.com/canaria3406/skport-auto-sign)*
+*Made with 💜 | Inspired by [nano-shino/EndfieldCheckin](https://github.com/nano-shino/EndfieldCheckin) and [Areha11Fz/ArknightsEndfieldAutoCheckIn](https://github.com/Areha11Fz/ArknightsEndfieldAutoCheckIn)*
